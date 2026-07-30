@@ -1,6 +1,7 @@
-# Protos
+# Fork of Protos
 
 A blueprint for personal AI assistants that build themselves.
+forked from [ninjudd/protos](https://github.com/ninjudd/protos)
 
 ## Why
 
