@@ -9,10 +9,10 @@ Write the consolidation cursor for a thread. Pass the `newCursor` value returned
 ## Input
 
 ```ts
-{ channelId: string, conversationId: string, cursor: number }
+{ channelId: string, conversationId: string, profile: string, cursor: number }
 ```
 
-`cursor` is the new cursor value (count of consolidated messages from the start of the JSONL). Use the `newCursor` returned by `read_thread_tail`. The field name matches the `cursor` field in `list_threads` output.
+`cursor` is the new cursor value (count of consolidated events in the merged conversation stream). Use the `newCursor` returned by `read_thread_tail`. `profile` selects which per-profile cursor to write — pass the same `profile` used for the paired `read_thread_tail` call. The `cursor` field name matches the `cursor` field in `list_threads` output.
 
 ## Output
 
@@ -24,7 +24,7 @@ Write the consolidation cursor for a thread. Pass the `newCursor` value returned
 
 ## Behavior
 
-- Writes a single integer to `runtime/threads/{channelId}/{conversationId}.cursor`.
+- Writes a single integer to the per-profile sidecar `runtime/threads/{channelId}/{conversationId}/{profile}.cursor`.
 - Creates the parent directory if missing (matching the threads module's lazy-create pattern).
 - Does NOT verify `cursor` against the thread's actual line count. The caller passes the `newCursor` from `read_thread_tail`; trusting it avoids re-reading the JSONL.
 - Refuses to move the cursor backward — if `cursor < previous`, return an error rather than silently rewinding. (Going backward would re-consolidate already-processed messages and likely create duplicate memory entries.)

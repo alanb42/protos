@@ -4,7 +4,7 @@ Enumerate conversation threads with pending consolidation work.
 
 ## Description (shown to the model)
 
-List conversation threads that have unconsolidated messages waiting, with each thread's total message count, current consolidation cursor, and the number of unconsolidated messages. Use this to plan a consolidation pass. By default, returns only threads with `unconsolidated >= 1`; pass `min_unconsolidated` to raise the threshold (e.g. `50` for opportunistic per-thread consolidation) or `0` for a full listing.
+List conversation threads that have unconsolidated messages waiting — one entry per `(channelId, conversationId, profile)` — with each entry's total message count, current consolidation cursor, and the number of unconsolidated messages. Use this to plan a consolidation pass. By default, returns only entries with `unconsolidated >= 1`; pass `min_unconsolidated` to raise the threshold (e.g. `50` for opportunistic per-thread consolidation) or `0` for a full listing.
 
 ## Input
 
@@ -21,19 +21,20 @@ List conversation threads that have unconsolidated messages waiting, with each t
   threads: Array<{
     channelId: string,
     conversationId: string,
-    total: number,         // total messages in the JSONL
+    profile: string,       // per-profile thread partition (e.g. "primary")
+    total: number,         // total messages in this profile's JSONL
     cursor: number,        // last consolidated index (0 if no cursor file)
     unconsolidated: number // total - cursor
   }>
 }
 ```
 
-`threads` is empty when no thread meets the threshold. Always returns the discriminated shape — never `null`.
+`threads` is empty when no `(channelId, conversationId, profile)` entry meets the threshold. Always returns the discriminated shape — never `null`.
 
 ## Behavior
 
-- Walks `runtime/threads/{channelId}/{conversationId}.jsonl`. For each, counts non-blank lines to compute `total`, reads the sidecar `*.cursor` file (a single integer; missing means `0`), computes `unconsolidated = total - cursor`, filters by `min_unconsolidated`.
-- Skips files that don't end in `.jsonl` and any directory entries that aren't conversation files.
+- Walks the profile-partitioned layout `runtime/threads/{channelId}/{conversationId}/{profile}.jsonl` (channel dir → conversation dir → one JSONL per profile; see `architecture.md` → Threads). For each profile JSONL, counts non-blank lines to compute `total`, reads the sibling `{profile}.cursor` file (a single integer; missing means `0`), computes `unconsolidated = total - cursor`, filters by `min_unconsolidated`.
+- Skips files that don't end in `.jsonl` and any entries that aren't channel/conversation directories.
 - Cheap to call — counts lines without parsing JSON.
 
 ## Dependencies

@@ -9,8 +9,10 @@ Return the messages in a thread that haven't been consolidated yet (everything f
 ## Input
 
 ```ts
-{ channelId: string, conversationId: string }
+{ channelId: string, conversationId: string, profile: string }
 ```
+
+`profile` selects the per-profile consolidation cursor to read from (e.g. `"primary"`). The messages themselves are read from the whole conversation (all profiles merged by timestamp — see Behavior); the cursor is per-profile.
 
 ## Output
 
@@ -28,7 +30,7 @@ Return the messages in a thread that haven't been consolidated yet (everything f
 
 ## Behavior
 
-- Reads the sidecar cursor file (missing means `0`), reads the JSONL.
+- Reads the per-profile `{profile}.cursor` sidecar (missing means `0`), then reads the conversation's events by merging **all** profile JSONLs in `runtime/threads/{channelId}/{conversationId}/` by timestamp (see `architecture.md` → Threads). The cursor indexes into that merged event stream, and `newCursor` is the merged event count at read time.
 - **Turn-boundary backward-alignment at the cursor.** If the stored cursor `C > 0` lands mid-turn (i.e. `events[C-1].turn_id === events[C].turn_id`), decrement `C` until that's no longer true before reading. This happens when a previous `read_thread_tail` snapshot caught a turn mid-flight and `advance_thread_cursor` stored a cursor pointing into its middle; the next read re-includes the full turn so the partial consolidation gets a second pass once the turn is complete. The rule is the same one used by `readEvents` at its head (see `build.md` → step 2), so a single invariant covers both surfaces: **a slice never starts mid-turn.** The backward walk is bounded by one turn — it never grows over time.
 - Applies the same render filter channels use (see `architecture.md` → Cursor-based replay → Render filter): for each `turn_id`, emit the user event and the **last** non-empty, non-`NO_REPLY` assistant text; hide intermediate assistant texts, tool calls, tool results, and audit events. Consolidation cares about the conversation, not the agent's internal reasoning or its lifecycle markers.
 - `newCursor` is the count of total **events** (lines) at read time. Pass this to `advance_thread_cursor` to mark the full span consolidated. **Don't compute the new cursor yourself** — using the value returned here avoids a race where events arriving between this call and `advance_thread_cursor` would otherwise be skipped.
